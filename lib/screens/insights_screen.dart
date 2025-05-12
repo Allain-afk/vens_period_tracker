@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:vens_period_tracker/models/period_data.dart';
 import 'package:vens_period_tracker/providers/cycle_provider.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
+import 'dart:math' as math;
 
 class InsightsScreen extends StatelessWidget {
   const InsightsScreen({super.key});
@@ -110,6 +111,18 @@ class InsightsScreen extends StatelessWidget {
                               color: AppColors.textMedium,
                             ),
                           ),
+                          
+                          if (cycleStats['stdDev'] > 0) ...[
+                            const Divider(),
+                            _buildStatRow(
+                              'Cycle Variability', 
+                              '${cycleStats['stdDev'].toStringAsFixed(1)} days'
+                            ),
+                            const SizedBox(height: 8),
+                            _buildVariabilityIndicator(cycleStats['stdDev']),
+                            const SizedBox(height: 8),
+                            _buildCyclePatternInfo(cycleProvider),
+                          ],
                         ],
                       ),
                     ),
@@ -414,11 +427,13 @@ class InsightsScreen extends StatelessWidget {
   }
   
   // Calculate cycle statistics
-  Map<String, int> _calculateCycleStats(List<PeriodData> records) {
+  Map<String, dynamic> _calculateCycleStats(List<PeriodData> records) {
     if (records.length < 2) {
       return {
         'minCycle': 0,
         'maxCycle': 0,
+        'variance': 0.0,
+        'stdDev': 0.0,
       };
     }
     
@@ -432,8 +447,8 @@ class InsightsScreen extends StatelessWidget {
           .difference(sortedRecords[i-1].startDate)
           .inDays;
       
-      if (daysBetween >= AppConstants.minCycleLength && 
-          daysBetween <= AppConstants.maxCycleLength) {
+      if (daysBetween >= AppConstants.minExtendedCycleLength && 
+          daysBetween <= AppConstants.maxExtendedCycleLength) {
         cycleLengths.add(daysBetween);
       }
     }
@@ -442,12 +457,23 @@ class InsightsScreen extends StatelessWidget {
       return {
         'minCycle': 0,
         'maxCycle': 0,
+        'variance': 0.0,
+        'stdDev': 0.0,
       };
     }
+    
+    // Calculate mean
+    double mean = cycleLengths.reduce((a, b) => a + b) / cycleLengths.length;
+    
+    // Calculate variance and standard deviation
+    double variance = cycleLengths.fold(0.0, (sum, length) => sum + math.pow((length - mean), 2)) / cycleLengths.length;
+    double stdDev = math.sqrt(variance);
     
     return {
       'minCycle': cycleLengths.reduce((a, b) => a < b ? a : b),
       'maxCycle': cycleLengths.reduce((a, b) => a > b ? a : b),
+      'variance': variance,
+      'stdDev': stdDev,
     };
   }
   
@@ -483,5 +509,153 @@ class InsightsScreen extends StatelessWidget {
       ..sort((a, b) => b.value.compareTo(a.value));
     
     return Map.fromEntries(sortedEntries);
+  }
+
+  // Add a method to display cycle pattern information
+  Widget _buildCyclePatternInfo(CycleProvider cycleProvider) {
+    if (cycleProvider.hasPatternDetected) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.insights, color: AppColors.accent, size: 14),
+              const SizedBox(width: 4),
+              const Text(
+                'Pattern Detected',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Your cycles appear to follow an alternating pattern (shorter-longer-shorter)',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMedium,
+            ),
+          ),
+        ],
+      );
+    } else if (cycleProvider.isHighlyIrregular) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.shuffle, color: AppColors.warning, size: 14),
+              const SizedBox(width: 4),
+              const Text(
+                'Irregular Cycles',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Your cycles are quite irregular. Predictions will use your most recent data for better accuracy.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMedium,
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle, color: AppColors.success, size: 14),
+              const SizedBox(width: 4),
+              const Text(
+                'Regular Cycles',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Your cycles are relatively consistent, which helps with prediction accuracy.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMedium,
+            ),
+          ),
+        ],
+      );
+    }
+  }
+  
+  // Add a method to visualize variability
+  Widget _buildVariabilityIndicator(double stdDev) {
+    Color color;
+    String text;
+    
+    if (stdDev < 2.0) {
+      color = AppColors.success;
+      text = 'Very Regular';
+    } else if (stdDev < 4.0) {
+      color = Colors.green[300]!;
+      text = 'Regular';
+    } else if (stdDev < 6.0) {
+      color = Colors.amber;
+      text = 'Somewhat Irregular';
+    } else if (stdDev < 8.0) {
+      color = Colors.orange;
+      text = 'Irregular';
+    } else {
+      color = AppColors.error;
+      text = 'Highly Irregular';
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: math.min(1.0, stdDev / 10.0),
+            backgroundColor: Colors.grey.shade200,
+            color: color,
+            minHeight: 6,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              stdDev < 4.0 
+                  ? 'Your cycles are consistent'
+                  : 'Higher variability makes predictions less certain',
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.textMedium,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 } 

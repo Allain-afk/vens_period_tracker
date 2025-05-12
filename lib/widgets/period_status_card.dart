@@ -17,16 +17,26 @@ class PeriodStatusCard extends StatelessWidget {
         Color statusColor;
         IconData statusIcon;
         
-        final records = cycleProvider.periodRecords;
+        // Sort records by date (most recent first)
+        final records = [...cycleProvider.periodRecords];
+        records.sort((a, b) => b.startDate.compareTo(a.startDate));
+        
         final today = DateTime.now();
         
-        // Check if currently on period
+        // Check if currently on period (only check recent periods)
         bool isOnPeriod = false;
         if (records.isNotEmpty) {
-          for (final record in records) {
+          // Only check the most recent period records
+          for (final record in records.take(3)) {
+            // Skip "intimacy-only" records (those without flow intensity)
+            if (record.flowIntensity.isEmpty) {
+              continue;
+            }
+            
             if (record.endDate == null) {
-              // Only start date recorded
-              if (isSameDay(record.startDate, today)) {
+              // Only start date recorded - period is ongoing if it started within last 7 days
+              if (today.difference(record.startDate).inDays <= 7 && 
+                  !today.isBefore(record.startDate)) {
                 isOnPeriod = true;
                 break;
               }

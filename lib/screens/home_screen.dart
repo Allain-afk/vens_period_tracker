@@ -7,6 +7,8 @@ import 'package:vens_period_tracker/providers/cycle_provider.dart';
 import 'package:vens_period_tracker/screens/add_period_screen.dart';
 import 'package:vens_period_tracker/screens/profile_screen.dart';
 import 'package:vens_period_tracker/screens/insights_screen.dart';
+import 'package:vens_period_tracker/screens/intimacy/intimacy_history_screen.dart';
+import 'package:vens_period_tracker/screens/intimacy/intimacy_log_screen.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 import 'package:vens_period_tracker/widgets/period_status_card.dart';
 import 'package:vens_period_tracker/widgets/prediction_card.dart';
@@ -173,6 +175,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
                             }
                             
+                            // Mark intimacy days
+                            final hasIntimacy = cycleProvider.getAllIntimacyData().any(
+                              (entry) => entry.hadIntimacy && isSameDay(entry.date, date)
+                            );
+                            
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -209,6 +216,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     height: 8,
                                     decoration: BoxDecoration(
                                       color: AppColors.success.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                if (hasIntimacy)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.pinkAccent,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -285,43 +301,41 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddPeriodScreen(
-                selectedDate: _selectedDay ?? DateTime.now(),
-              ),
-            ),
-          );
+          _showActionOptions(context);
         },
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textLight,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Calendar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'Insights',
-          ),
-        ],
         onTap: (index) {
           if (index == 1) {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => const InsightsScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => const InsightsScreen()),
+            );
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const IntimacyHistoryScreen()),
             );
           }
         },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Intimacy',
+          ),
+        ],
       ),
     );
   }
@@ -343,6 +357,89 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(label, style: const TextStyle(fontSize: 14)),
         ],
       ),
+    );
+  }
+
+  void _showActionOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'What would you like to log?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.water_drop, 
+                    color: AppColors.primary,
+                  ),
+                ),
+                title: const Text('Period'),
+                subtitle: const Text('Log your period start/end dates and symptoms'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddPeriodScreen(
+                        selectedDate: _selectedDay!,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.pink.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.favorite, 
+                    color: Colors.pink,
+                  ),
+                ),
+                title: const Text('Intimacy'),
+                subtitle: const Text('Log intimate moments, protected or unprotected'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => IntimacyLogScreen(
+                        initialDate: _selectedDay,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 } 

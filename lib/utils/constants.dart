@@ -28,6 +28,10 @@ class AppConstants {
   static const int minCycleLength = 21;
   static const int maxCycleLength = 35;
   
+  // Extended range for irregular cycles
+  static const int minExtendedCycleLength = 14;
+  static const int maxExtendedCycleLength = 50;
+  
   // Fertility window
   static const int ovulationDayOffset = 14;  // Days before next period
   static const int fertileDaysBeforeOvulation = 5;
@@ -42,4 +46,5 @@ class AppConstants {
   static const String lowAccuracy = "Low accuracy (fewer than 3 cycles recorded)";
   static const String mediumAccuracy = "Medium accuracy (3-6 cycles recorded)";
   static const String highAccuracy = "High accuracy (more than 6 cycles recorded)";
+  static const String irregularCycleMessage = "Adapted for irregular cycles (using recent data)";
 } 

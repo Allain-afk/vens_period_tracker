@@ -13,6 +13,7 @@ void main() async {
   // Initialize Hive for local storage
   await Hive.initFlutter();
   Hive.registerAdapter(PeriodDataAdapter());
+  Hive.registerAdapter(IntimacyDataAdapter());
   await Hive.openBox<PeriodData>('period_data');
   await Hive.openBox('user_preferences');
   

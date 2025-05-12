@@ -73,17 +73,17 @@ class PredictionCard extends StatelessWidget {
                     ),
                   ],
                   
+                  const SizedBox(height: 16),
+                  const Divider(),
                   const SizedBox(height: 8),
-                  Center(
-                    child: Text(
-                      cycleProvider.getPredictionAccuracy(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textLight,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
+                  
+                  // Prediction confidence information
+                  _buildConfidenceIndicator(cycleProvider),
+                  
+                  if (cycleProvider.hasPatternDetected || cycleProvider.isHighlyIrregular) ...[
+                    const SizedBox(height: 10),
+                    _buildPatternInfo(cycleProvider),
+                  ],
                 ],
               ),
             ),
@@ -102,18 +102,18 @@ class PredictionCard extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
             color: color,
-            size: 20,
+            size: 24,
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,7 +127,7 @@ class PredictionCard extends StatelessWidget {
               ),
               Text(
                 date,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.textMedium,
                 ),
               ),
@@ -136,5 +136,110 @@ class PredictionCard extends StatelessWidget {
         ),
       ],
     );
+  }
+  
+  Widget _buildConfidenceIndicator(CycleProvider cycleProvider) {
+    final confidence = cycleProvider.getPredictionConfidence();
+    
+    Color confidenceColor;
+    if (confidence < 50) {
+      confidenceColor = AppColors.warning;
+    } else if (confidence < 75) {
+      confidenceColor = Colors.orange;
+    } else {
+      confidenceColor = AppColors.success;
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Prediction Confidence:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$confidence%',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: confidenceColor,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              _getConfidenceIcon(confidence),
+              color: confidenceColor,
+              size: 20,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: confidence / 100,
+            backgroundColor: Colors.grey.shade200,
+            color: confidenceColor,
+            minHeight: 6,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          cycleProvider.getPredictionAccuracy(),
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textMedium,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildPatternInfo(CycleProvider cycleProvider) {
+    String patternText;
+    IconData patternIcon;
+    
+    if (cycleProvider.hasPatternDetected) {
+      patternText = 'Pattern detected: Your cycles appear to alternate between longer and shorter lengths';
+      patternIcon = Icons.insights;
+    } else if (cycleProvider.isHighlyIrregular) {
+      patternText = 'Your cycles are irregular. Predictions are based on your most recent cycles.';
+      patternIcon = Icons.shuffle;
+    } else {
+      return const SizedBox.shrink();
+    }
+    
+    return Row(
+      children: [
+        Icon(
+          patternIcon,
+          color: AppColors.accent,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            patternText,
+            style: const TextStyle(
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  IconData _getConfidenceIcon(int confidence) {
+    if (confidence < 50) {
+      return Icons.sentiment_dissatisfied;
+    } else if (confidence < 75) {
+      return Icons.sentiment_neutral;
+    } else {
+      return Icons.sentiment_very_satisfied;
+    }
   }
 } 

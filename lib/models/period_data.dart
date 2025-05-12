@@ -21,6 +21,9 @@ class PeriodData extends HiveObject {
 
   @HiveField(5)
   final String notes; // Any additional notes
+  
+  @HiveField(6)
+  final List<IntimacyData>? intimacyData; // List of intimacy entries
 
   PeriodData({
     required this.startDate,
@@ -29,6 +32,7 @@ class PeriodData extends HiveObject {
     this.symptoms = const [],
     this.mood = 'neutral',
     this.notes = '',
+    this.intimacyData,
   });
 
   int get durationInDays {
@@ -44,6 +48,7 @@ class PeriodData extends HiveObject {
     List<String>? symptoms,
     String? mood,
     String? notes,
+    List<IntimacyData>? intimacyData,
   }) {
     return PeriodData(
       startDate: startDate ?? this.startDate,
@@ -52,8 +57,32 @@ class PeriodData extends HiveObject {
       symptoms: symptoms ?? List<String>.from(this.symptoms),
       mood: mood ?? this.mood,
       notes: notes ?? this.notes,
+      intimacyData: intimacyData ?? this.intimacyData,
     );
   }
+}
+
+// New class for intimacy data
+@HiveType(typeId: 1)
+class IntimacyData extends HiveObject {
+  @HiveField(0)
+  final DateTime date;
+  
+  @HiveField(1)
+  final bool hadIntimacy;
+  
+  @HiveField(2)
+  final bool wasProtected;
+  
+  @HiveField(3)
+  final String notes;
+  
+  IntimacyData({
+    required this.date,
+    required this.hadIntimacy,
+    this.wasProtected = false,
+    this.notes = '',
+  });
 }
 
 // Enum Classes for better type safety
