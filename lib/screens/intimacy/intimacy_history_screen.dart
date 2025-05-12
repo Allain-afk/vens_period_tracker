@@ -14,6 +14,14 @@ class IntimacyHistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Intimacy History'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              _showHelpDialog(context);
+            },
+          ),
+        ],
       ),
       body: Consumer<CycleProvider>(
         builder: (context, cycleProvider, child) {
@@ -244,6 +252,41 @@ class IntimacyHistoryScreen extends StatelessWidget {
               'Delete',
               style: TextStyle(color: Colors.red),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Intimacy History Help'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('On this screen, you can:'),
+            SizedBox(height: 8),
+            Text('• View all your intimacy records'),
+            Text('• Delete entries if needed'),
+            Text('• Add new intimacy records using the + button'),
+            SizedBox(height: 16),
+            Text('Intimacy data is color-coded:'),
+            SizedBox(height: 8),
+            Text('• Green: Protected intimacy'),
+            Text('• Yellow: Unprotected intimacy'),
+            SizedBox(height: 16),
+            Text('This information helps with fertility tracking.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Got it'),
           ),
         ],
       ),

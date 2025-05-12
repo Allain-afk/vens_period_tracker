@@ -9,6 +9,7 @@ import 'package:vens_period_tracker/screens/profile_screen.dart';
 import 'package:vens_period_tracker/screens/insights_screen.dart';
 import 'package:vens_period_tracker/screens/intimacy/intimacy_history_screen.dart';
 import 'package:vens_period_tracker/screens/intimacy/intimacy_log_screen.dart';
+import 'package:vens_period_tracker/screens/period_history_screen.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 import 'package:vens_period_tracker/widgets/period_status_card.dart';
 import 'package:vens_period_tracker/widgets/prediction_card.dart';
@@ -309,13 +310,24 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textDark,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        elevation: 8,
         onTap: (index) {
           if (index == 1) {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const InsightsScreen()),
+              MaterialPageRoute(builder: (context) => const PeriodHistoryScreen()),
             );
           } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const InsightsScreen()),
+            );
+          } else if (index == 3) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const IntimacyHistoryScreen()),
@@ -325,14 +337,22 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
+            activeIcon: Icon(Icons.home, size: 28),
             label: 'Home',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            activeIcon: Icon(Icons.history, size: 28),
+            label: 'History',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.insights),
+            activeIcon: Icon(Icons.insights, size: 28),
             label: 'Insights',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite),
+            activeIcon: Icon(Icons.favorite, size: 28),
             label: 'Intimacy',
           ),
         ],

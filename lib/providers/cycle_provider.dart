@@ -76,8 +76,32 @@ class CycleProvider with ChangeNotifier {
   // Delete a period record
   Future<void> deletePeriodRecord(String key) async {
     final box = Hive.box<PeriodData>('period_data');
-    await box.delete(key);
-    _periodRecords.removeWhere((element) => element.key == key);
+    
+    // Check if the record contains intimacy data
+    final recordToDelete = _periodRecords.firstWhere((element) => element.key == key);
+    
+    if (recordToDelete.intimacyData != null && recordToDelete.intimacyData!.isNotEmpty) {
+      // If it has intimacy data, convert it to an intimacy-only record instead of deleting
+      final updatedRecord = PeriodData(
+        startDate: recordToDelete.startDate,
+        flowIntensity: "", // Empty to mark as intimacy-only
+        intimacyData: recordToDelete.intimacyData,
+      );
+      
+      // Update instead of delete
+      await box.put(key, updatedRecord);
+      
+      // Update in memory
+      final index = _periodRecords.indexWhere((element) => element.key == key);
+      if (index != -1) {
+        _periodRecords[index] = updatedRecord;
+      }
+    } else {
+      // If no intimacy data, just delete the record
+      await box.delete(key);
+      _periodRecords.removeWhere((element) => element.key == key);
+    }
+    
     _calculateAverageCycleLength();
     _detectCyclePatterns();
     notifyListeners();
