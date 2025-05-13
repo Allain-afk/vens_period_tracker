@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:vens_period_tracker/providers/cycle_provider.dart';
+import 'package:vens_period_tracker/providers/pill_provider.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 
 class PredictionCard extends StatelessWidget {
@@ -13,8 +14,13 @@ class PredictionCard extends StatelessWidget {
     
     return Consumer<CycleProvider>(
       builder: (context, cycleProvider, child) {
-        final nextPeriod = cycleProvider.getNextPeriodDate();
-        final fertilityWindow = cycleProvider.getFertilityWindow();
+        // Get pill provider to check if using hormonal birth control
+        final pillProvider = Provider.of<PillProvider>(context, listen: false);
+        final isUsingHormonalBC = pillProvider.isUsingHormonalBirthControl;
+        
+        // Pass context to the methods so they can access pill provider
+        final nextPeriod = cycleProvider.getNextPeriodDate(context: context);
+        final fertilityWindow = cycleProvider.getFertilityWindow(context: context);
         
         if (nextPeriod == null) {
           return const SizedBox.shrink(); // No data to show
@@ -45,17 +51,17 @@ class PredictionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Next period prediction
+                  // Next period prediction - with appropriate label for BC users
                   _buildPredictionItem(
                     icon: Icons.opacity,
-                    title: 'Next Period',
+                    title: isUsingHormonalBC ? 'Next Withdrawal Bleeding' : 'Next Period',
                     date: '${dateFormat.format(nextPeriod)} - ${dateFormat.format(nextPeriodEnd)}',
                     color: AppColors.primary,
                   ),
                   const SizedBox(height: 12),
                   
-                  // Fertility window
-                  if (fertilityWindow != null) ...[
+                  // Only show fertility window for non-hormonal BC users
+                  if (fertilityWindow != null && !isUsingHormonalBC) ...[
                     _buildPredictionItem(
                       icon: Icons.favorite,
                       title: 'Fertility Window',
@@ -73,16 +79,32 @@ class PredictionCard extends StatelessWidget {
                     ),
                   ],
                   
+                  // For hormonal BC users, show pill pack info
+                  if (isUsingHormonalBC && pillProvider.hasPillData) ...[
+                    const SizedBox(height: 12),
+                    _buildPredictionItem(
+                      icon: Icons.medication_outlined,
+                      title: 'Birth Control Info',
+                      date: 'Predictions based on your pill pack schedule',
+                      color: AppColors.pillActive,
+                    ),
+                  ],
+                  
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 8),
                   
-                  // Prediction confidence information
-                  _buildConfidenceIndicator(cycleProvider),
-                  
-                  if (cycleProvider.hasPatternDetected || cycleProvider.isHighlyIrregular) ...[
-                    const SizedBox(height: 10),
-                    _buildPatternInfo(cycleProvider),
+                  // Only show prediction confidence for natural cycles
+                  if (!isUsingHormonalBC) ...[
+                    _buildConfidenceIndicator(cycleProvider),
+                    
+                    if (cycleProvider.hasPatternDetected || cycleProvider.isHighlyIrregular) ...[
+                      const SizedBox(height: 10),
+                      _buildPatternInfo(cycleProvider),
+                    ],
+                  ] else ...[
+                    // Show hormonal BC info instead
+                    _buildHormonalBCInfo(pillProvider),
                   ],
                 ],
               ),
@@ -90,6 +112,46 @@ class PredictionCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+  
+  Widget _buildHormonalBCInfo(PillProvider pillProvider) {
+    if (!pillProvider.hasPillData) return const SizedBox.shrink();
+    
+    final pillData = pillProvider.pillData!;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: AppColors.pillActive,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Hormonal Birth Control',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Your pack has ${pillData.activePillCount} active pills and ${pillData.placeboPillCount} placebo pills. ' +
+          'While using hormonal birth control, you will not have a natural menstrual cycle. ' +
+          'Any bleeding during placebo days is withdrawal bleeding, not a true period.',
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textMedium,
+          ),
+        ),
+      ],
     );
   }
   

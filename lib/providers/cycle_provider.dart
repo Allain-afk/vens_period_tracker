@@ -4,6 +4,9 @@ import 'package:vens_period_tracker/models/period_data.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 import 'package:vens_period_tracker/utils/notification_service.dart';
 import 'dart:math' as math;
+import 'package:vens_period_tracker/providers/pill_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class CycleProvider with ChangeNotifier {
   List<PeriodData> _periodRecords = [];
@@ -224,10 +227,34 @@ class CycleProvider with ChangeNotifier {
   }
   
   // Get the next predicted period start date
-  DateTime? getNextPeriodDate() {
+  DateTime? getNextPeriodDate({BuildContext? context}) {
     if (_periodRecords.isEmpty) return null;
     
-    // Sort periods by start date to get the most recent one
+    // Check if user is using hormonal birth control - safely access if context provided
+    bool isUsingHormonalBC = false;
+    if (context != null) {
+      final pillProvider = Provider.of<PillProvider>(context, listen: false);
+      isUsingHormonalBC = pillProvider.isUsingHormonalBirthControl;
+      
+      if (isUsingHormonalBC && pillProvider.hasPillData) {
+        final pillData = pillProvider.pillData!;
+        final currentDay = pillData.getCurrentPillDay();
+        final totalDays = pillData.activePillCount + pillData.placeboPillCount;
+        
+        // Calculate when the next placebo days will start
+        final daysUntilPlacebo = pillData.activePillCount - currentDay;
+        if (daysUntilPlacebo >= 0) {
+          // User is in active pill phase
+          return DateTime.now().add(Duration(days: daysUntilPlacebo + 1));
+        } else {
+          // User is already in placebo phase, next withdrawal bleed will be after
+          // completing this pack and the active pills of the next pack
+          return DateTime.now().add(Duration(days: (totalDays - currentDay) + pillData.activePillCount + 1));
+        }
+      }
+    }
+    
+    // If not using hormonal birth control or context not available, use standard prediction
     _periodRecords.sort((a, b) => b.startDate.compareTo(a.startDate));
     final lastPeriod = _periodRecords.first;
     
@@ -251,17 +278,42 @@ class CycleProvider with ChangeNotifier {
   }
   
   // Get predicted ovulation date
-  DateTime? getOvulationDate() {
-    final nextPeriod = getNextPeriodDate();
+  DateTime? getOvulationDate({BuildContext? context}) {
+    // Check if user is using hormonal birth control
+    bool isUsingHormonalBC = false;
+    if (context != null) {
+      final pillProvider = Provider.of<PillProvider>(context, listen: false);
+      isUsingHormonalBC = pillProvider.isUsingHormonalBirthControl;
+      
+      if (isUsingHormonalBC) {
+        // No ovulation occurs with hormonal birth control
+        return null;
+      }
+    }
+    
+    // If not using hormonal birth control or context not available
+    final nextPeriod = getNextPeriodDate(context: context);
     if (nextPeriod == null) return null;
     
-    // Ovulation typically occurs 14 days before the next period
     return nextPeriod.subtract(const Duration(days: AppConstants.ovulationDayOffset));
   }
   
   // Get fertility window (usually 5 days before and 1 day after ovulation)
-  Map<String, DateTime?>? getFertilityWindow() {
-    final ovulationDate = getOvulationDate();
+  Map<String, DateTime?>? getFertilityWindow({BuildContext? context}) {
+    // Check if user is using hormonal birth control
+    bool isUsingHormonalBC = false;
+    if (context != null) {
+      final pillProvider = Provider.of<PillProvider>(context, listen: false);
+      isUsingHormonalBC = pillProvider.isUsingHormonalBirthControl;
+      
+      if (isUsingHormonalBC) {
+        // No fertility window with hormonal birth control
+        return null;
+      }
+    }
+    
+    // If not using hormonal birth control or context not available
+    final ovulationDate = getOvulationDate(context: context);
     if (ovulationDate == null) return null;
     
     final fertilityStart = ovulationDate.subtract(

@@ -24,9 +24,30 @@ class NotificationService {
     print('Notification would be shown here');
   }
   
+  // Schedule a daily pill reminder
+  Future<void> scheduleDailyPillReminder(
+    int hour, 
+    int minute, 
+    String title, 
+    String body, 
+    {int id = 2000}
+  ) async {
+    // This is a placeholder that would schedule a daily pill reminder
+    print('Daily pill reminder scheduled for $hour:$minute');
+    print('Title: $title');
+    print('Body: $body');
+    print('ID: $id');
+  }
+  
   // Cancel all notifications
   Future<void> cancelAllNotifications() async {
     // This would cancel notifications if we had any
     print('Notifications would be cancelled here');
+  }
+  
+  // Cancel only pill reminders
+  Future<void> cancelAllPillReminders() async {
+    // This would cancel pill reminders if we had any
+    print('Pill reminders would be cancelled here');
   }
 } 

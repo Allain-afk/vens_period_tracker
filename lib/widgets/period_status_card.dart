@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:vens_period_tracker/providers/cycle_provider.dart';
+import 'package:vens_period_tracker/providers/pill_provider.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 
 class PeriodStatusCard extends StatelessWidget {
@@ -11,6 +12,10 @@ class PeriodStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<CycleProvider>(
       builder: (context, cycleProvider, child) {
+        // Get reference to pill provider to check if user is using hormonal birth control
+        final pillProvider = Provider.of<PillProvider>(context, listen: false);
+        final isUsingHormonalBC = pillProvider.isUsingHormonalBirthControl;
+
         // Status determination
         String statusTitle;
         String statusMessage;
@@ -51,11 +56,11 @@ class PeriodStatusCard extends StatelessWidget {
           }
         }
         
-        // Get next period date
-        final nextPeriodDate = cycleProvider.getNextPeriodDate();
+        // Get next period date - pass context for BC awareness
+        final nextPeriodDate = cycleProvider.getNextPeriodDate(context: context);
         
-        // Get fertility window
-        final fertilityWindow = cycleProvider.getFertilityWindow();
+        // Get fertility window - pass context for BC awareness
+        final fertilityWindow = cycleProvider.getFertilityWindow(context: context);
         bool isDuringFertileWindow = false;
         bool isOvulationDay = false;
         
@@ -73,7 +78,9 @@ class PeriodStatusCard extends StatelessWidget {
         // Set status message based on current state
         if (isOnPeriod) {
           statusTitle = 'Period in Progress';
-          statusMessage = 'You are currently on your period.';
+          statusMessage = isUsingHormonalBC 
+              ? 'You are currently having withdrawal bleeding.'
+              : 'You are currently on your period.';
           statusColor = AppColors.accent;
           statusIcon = Icons.opacity;
         } else if (isOvulationDay) {
@@ -90,19 +97,25 @@ class PeriodStatusCard extends StatelessWidget {
           final daysUntil = nextPeriodDate.difference(today).inDays;
           
           if (daysUntil <= 3 && daysUntil > 0) {
-            statusTitle = 'Period Coming Soon';
-            statusMessage = 'Your period is expected to start in $daysUntil days.';
+            statusTitle = isUsingHormonalBC ? 'Withdrawal Bleeding Soon' : 'Period Coming Soon';
+            statusMessage = isUsingHormonalBC
+                ? 'Your withdrawal bleeding is expected to start in $daysUntil days.'
+                : 'Your period is expected to start in $daysUntil days.';
             statusColor = AppColors.primary;
             statusIcon = Icons.event_available;
           } else if (daysUntil == 0) {
-            statusTitle = 'Period Expected Today';
-            statusMessage = 'Your period is expected to start today.';
+            statusTitle = isUsingHormonalBC ? 'Withdrawal Bleeding Expected' : 'Period Expected Today';
+            statusMessage = isUsingHormonalBC
+                ? 'Your withdrawal bleeding is expected to start today.'
+                : 'Your period is expected to start today.';
             statusColor = AppColors.primary;
             statusIcon = Icons.event;
           } else {
-            statusTitle = 'Next Period';
+            statusTitle = isUsingHormonalBC ? 'Next Withdrawal Bleeding' : 'Next Period';
             final dateFormat = DateFormat.MMMd();
-            statusMessage = 'Your next period is expected on ${dateFormat.format(nextPeriodDate)}.';
+            statusMessage = isUsingHormonalBC
+                ? 'Your next withdrawal bleeding is expected on ${dateFormat.format(nextPeriodDate)}.'
+                : 'Your next period is expected on ${dateFormat.format(nextPeriodDate)}.';
             statusColor = AppColors.secondary;
             statusIcon = Icons.calendar_today;
           }

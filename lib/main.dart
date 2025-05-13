@@ -3,7 +3,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:vens_period_tracker/screens/home_screen.dart';
 import 'package:vens_period_tracker/models/period_data.dart';
+import 'package:vens_period_tracker/models/pill_data.dart';
 import 'package:vens_period_tracker/providers/cycle_provider.dart';
+import 'package:vens_period_tracker/providers/pill_provider.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 import 'package:vens_period_tracker/utils/notification_service.dart';
 
@@ -14,7 +16,10 @@ void main() async {
   await Hive.initFlutter();
   Hive.registerAdapter(PeriodDataAdapter());
   Hive.registerAdapter(IntimacyDataAdapter());
+  Hive.registerAdapter(PillDataAdapter());
+  Hive.registerAdapter(PillLogEntryAdapter());
   await Hive.openBox<PeriodData>('period_data');
+  await Hive.openBox<PillData>('pill_data');
   await Hive.openBox('user_preferences');
   
   // Initialize notifications
@@ -28,8 +33,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => CycleProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => CycleProvider()),
+        ChangeNotifierProvider(create: (context) => PillProvider()),
+      ],
       child: MaterialApp(
         title: "Ven's Period Tracker",
         debugShowCheckedModeBanner: false,

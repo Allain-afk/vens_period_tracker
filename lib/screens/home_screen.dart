@@ -4,12 +4,14 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:vens_period_tracker/models/period_data.dart';
 import 'package:vens_period_tracker/providers/cycle_provider.dart';
+import 'package:vens_period_tracker/providers/pill_provider.dart';
 import 'package:vens_period_tracker/screens/add_period_screen.dart';
 import 'package:vens_period_tracker/screens/profile_screen.dart';
 import 'package:vens_period_tracker/screens/insights_screen.dart';
 import 'package:vens_period_tracker/screens/intimacy/intimacy_history_screen.dart';
 import 'package:vens_period_tracker/screens/intimacy/intimacy_log_screen.dart';
 import 'package:vens_period_tracker/screens/period_history_screen.dart';
+import 'package:vens_period_tracker/screens/pill_tracking_screen.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 import 'package:vens_period_tracker/widgets/period_status_card.dart';
 import 'package:vens_period_tracker/widgets/prediction_card.dart';
@@ -330,6 +332,11 @@ class _HomeScreenState extends State<HomeScreen> {
           } else if (index == 3) {
             Navigator.push(
               context,
+              MaterialPageRoute(builder: (context) => const PillTrackingScreen()),
+            );
+          } else if (index == 4) {
+            Navigator.push(
+              context,
               MaterialPageRoute(builder: (context) => const IntimacyHistoryScreen()),
             );
           }
@@ -349,6 +356,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.insights),
             activeIcon: Icon(Icons.insights, size: 28),
             label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.medication_outlined),
+            activeIcon: Icon(Icons.medication_outlined, size: 28),
+            label: 'Birth Control',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite),
@@ -453,6 +465,39 @@ class _HomeScreenState extends State<HomeScreen> {
                         initialDate: _selectedDay,
                       ),
                     ),
+                  );
+                },
+              ),
+              const Divider(),
+              Consumer<PillProvider>(
+                builder: (context, pillProvider, child) {
+                  return ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.pillActive.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.medication_outlined, 
+                        color: AppColors.pillActive,
+                      ),
+                    ),
+                    title: const Text('Birth Control'),
+                    subtitle: Text(
+                      pillProvider.hasPillData
+                          ? 'Log today\'s pill intake'
+                          : 'Set up your birth control tracking'
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PillTrackingScreen(),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
