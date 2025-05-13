@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'package:vens_period_tracker/providers/pill_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CycleProvider with ChangeNotifier {
   List<PeriodData> _periodRecords = [];
@@ -61,53 +62,132 @@ class CycleProvider with ChangeNotifier {
     notifyListeners();
   }
   
+  // Helper method to get a valid Hive key
+  dynamic _getValidHiveKey(String keyString) {
+    // Check if the key is already a valid format
+    if (keyString.startsWith('0:')) {
+      // This is already in Hive format, extract the numeric part
+      final parts = keyString.split(':');
+      if (parts.length >= 2) {
+        try {
+          return int.parse(parts[1]);
+        } catch (e) {
+          print('Error parsing key: $e');
+          return keyString; // Return original if parsing fails
+        }
+      }
+    }
+    
+    // Try to interpret as an integer key
+    try {
+      return int.parse(keyString);
+    } catch (e) {
+      // If not parseable as int, return as is
+      return keyString;
+    }
+  }
+
   // Update an existing period record
-  Future<void> updatePeriodRecord(String key, PeriodData updatedRecord) async {
+  Future<void> updatePeriodRecord(String keyString, PeriodData updatedRecord) async {
     final box = Hive.box<PeriodData>('period_data');
-    final index = _periodRecords.indexWhere((element) => element.key == key);
+    final index = _periodRecords.indexWhere((element) => element.key.toString() == keyString);
+    
+    print('Updating period record:');
+    print('- Record key string: $keyString');
+    print('- Found in records? ${index != -1}');
+    print('- Start date: ${updatedRecord.startDate}');
+    print('- End date: ${updatedRecord.endDate}');
+    
+    // Convert keyString to a valid Hive key
+    final key = _getValidHiveKey(keyString);
+    print('- Converted key: $key (${key.runtimeType})');
     
     if (index != -1) {
-      await box.put(key, updatedRecord);
-      _periodRecords[index] = updatedRecord;
-      _calculateAverageCycleLength();
-      _detectCyclePatterns();
-      _schedulePredictionsNotifications();
-      notifyListeners();
+      try {
+        // Get existing record to debug
+        final existingRecord = _periodRecords[index];
+        print('- Existing start date: ${existingRecord.startDate}');
+        print('- Existing end date: ${existingRecord.endDate}');
+        print('- Existing key: ${existingRecord.key}');
+        
+        // Update in Hive
+        await box.put(existingRecord.key, updatedRecord);
+        
+        // Update in memory
+        _periodRecords[index] = updatedRecord;
+        
+        // Recalculate cycle data
+        _calculateAverageCycleLength();
+        _detectCyclePatterns();
+        _schedulePredictionsNotifications();
+        notifyListeners();
+        
+        print('Period record updated successfully');
+      } catch (e) {
+        print('Error updating period record: $e');
+        // Try again with the converted key
+        try {
+          await box.put(key, updatedRecord);
+          
+          // Reload to ensure we have the latest data
+          _periodRecords = box.values.toList();
+          _calculateAverageCycleLength();
+          _detectCyclePatterns();
+          notifyListeners();
+          print('Period record updated using converted key');
+        } catch (e) {
+          print('Failed to update period record: $e');
+        }
+      }
+    } else {
+      print('WARNING: Period record not found in memory for key: $keyString');
+      try {
+        // Try to update by key directly in Hive
+        await box.put(key, updatedRecord);
+        
+        // Reload records to get fresh data
+        _periodRecords = box.values.toList();
+        _calculateAverageCycleLength();
+        _detectCyclePatterns();
+        notifyListeners();
+        print('Period record updated by direct Hive access');
+      } catch (e) {
+        print('Failed to update period record by key: $e');
+        
+        // Last resort: add as a new record if we can't update
+        print('Attempting to add as a new record');
+        try {
+          await addPeriodRecord(updatedRecord);
+          print('Added as a new record instead of updating');
+        } catch (e) {
+          print('Failed to add as new record: $e');
+        }
+      }
     }
   }
   
   // Delete a period record
-  Future<void> deletePeriodRecord(String key) async {
+  Future<void> deletePeriodRecord(String key, {bool forceDelete = false}) async {
     final box = Hive.box<PeriodData>('period_data');
     
-    // Check if the record contains intimacy data
-    final recordToDelete = _periodRecords.firstWhere((element) => element.key == key);
-    
-    if (recordToDelete.intimacyData != null && recordToDelete.intimacyData!.isNotEmpty) {
-      // If it has intimacy data, convert it to an intimacy-only record instead of deleting
-      final updatedRecord = PeriodData(
-        startDate: recordToDelete.startDate,
-        flowIntensity: "", // Empty to mark as intimacy-only
-        intimacyData: recordToDelete.intimacyData,
-      );
-      
-      // Update instead of delete
-      await box.put(key, updatedRecord);
-      
-      // Update in memory
-      final index = _periodRecords.indexWhere((element) => element.key == key);
-      if (index != -1) {
-        _periodRecords[index] = updatedRecord;
-      }
-    } else {
-      // If no intimacy data, just delete the record
+    try {
+      // Simply delete the record without checking for intimacy data
       await box.delete(key);
       _periodRecords.removeWhere((element) => element.key == key);
+      
+      _calculateAverageCycleLength();
+      _detectCyclePatterns();
+      notifyListeners();
+    } catch (e) {
+      print('Error deleting period record: $e');
+      
+      // Fallback: just delete the record from Hive and memory
+      await box.delete(key);
+      _periodRecords.removeWhere((element) => element.key == key);
+      _calculateAverageCycleLength();
+      _detectCyclePatterns();
+      notifyListeners();
     }
-    
-    _calculateAverageCycleLength();
-    _detectCyclePatterns();
-    notifyListeners();
   }
   
   // Update username
@@ -351,6 +431,27 @@ class CycleProvider with ChangeNotifier {
     }
   }
   
+  // Update notifications based on user preferences
+  Future<void> updateNotifications() async {
+    // Cancel all existing notifications first
+    await _notificationService.cancelAllNotifications();
+    
+    // Get user preferences
+    final prefs = await SharedPreferences.getInstance();
+    final periodNotifications = prefs.getBool('period_notifications') ?? true;
+    final ovulationNotifications = prefs.getBool('ovulation_notifications') ?? true;
+    final fertileDaysNotifications = prefs.getBool('fertile_days_notifications') ?? true;
+    
+    // If all notifications are disabled, we can return early
+    if (!periodNotifications && !ovulationNotifications && !fertileDaysNotifications) {
+      return;
+    }
+    
+    // Schedule notifications based on preferences - not actually implemented in the notification service
+    // This is just a placeholder that would schedule the appropriate notifications
+    await _schedulePredictionsNotifications();
+  }
+  
   // Get prediction confidence level (as a percentage)
   int getPredictionConfidence() {
     if (_periodRecords.length < 2) {
@@ -497,5 +598,18 @@ class CycleProvider with ChangeNotifier {
     return date1.year == date2.year && 
            date1.month == date2.month && 
            date1.day == date2.day;
+  }
+  
+  // Reset all data (used for clearing all app data)
+  void resetData() {
+    _periodRecords = [];
+    _username = 'Guest';
+    _averageCycleLength = AppConstants.defaultCycleLength;
+    _averagePeriodLength = AppConstants.defaultPeriodLength;
+    _recentCycleLengths = [];
+    _hasPatternDetected = false;
+    _isHighlyIrregular = false;
+    _loadPeriodData(); // Reload from Hive (which should now be empty)
+    notifyListeners();
   }
 } 

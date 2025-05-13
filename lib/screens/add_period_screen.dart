@@ -20,8 +20,11 @@ class AddPeriodScreen extends StatefulWidget {
 }
 
 class _AddPeriodScreenState extends State<AddPeriodScreen> {
-  late DateTime _startDate;
-  DateTime? _endDate;
+  late DateTime _selectedDate;
+  PeriodData? _lastActivePeriod;
+  bool _isPeriodStart = true;
+  bool _isPeriodEnd = false;
+  bool _isContinuingPeriod = false;
   String _flowIntensity = FlowIntensity.medium;
   List<String> _selectedSymptoms = [];
   String _mood = MoodType.neutral;
@@ -30,16 +33,88 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedDate = widget.selectedDate;
+    
     if (widget.existingData != null) {
-      _startDate = widget.existingData!.startDate;
-      _endDate = widget.existingData!.endDate;
+      // If we're editing an existing record
       _flowIntensity = widget.existingData!.flowIntensity;
       _selectedSymptoms = List<String>.from(widget.existingData!.symptoms);
       _mood = widget.existingData!.mood;
       _notesController.text = widget.existingData!.notes;
+      _isPeriodEnd = widget.existingData!.endDate != null;
+      print('Editing existing record: ${widget.existingData!.key}');
     } else {
-      _startDate = widget.selectedDate;
+      // Check if there's an ongoing period
+      _checkForActivePeriod();
     }
+  }
+
+  void _checkForActivePeriod() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final cycleProvider = Provider.of<CycleProvider>(context, listen: false);
+      
+      // Find the most recent period without an end date
+      final periods = cycleProvider.periodRecords;
+      print('Checking for active period. Total records: ${periods.length}');
+      
+      if (periods.isNotEmpty) {
+        // Sort by start date, newest first
+        final sortedPeriods = List<PeriodData>.from(periods);
+        sortedPeriods.sort((a, b) => b.startDate.compareTo(a.startDate));
+        
+        PeriodData? activePeriod;
+        for (final period in sortedPeriods) {
+          print('Period record: ${period.key}, Start: ${period.startDate}, End: ${period.endDate}');
+          // Check if this period is active (has no end date)
+          if (period.endDate == null) {
+            activePeriod = period;
+            break;
+          }
+        }
+        
+        if (activePeriod != null) {
+          print('Found active period: ${activePeriod.key}, Started: ${activePeriod.startDate}');
+          
+          // Check if selected date is the same as the start date of active period
+          final isSameStartDate = cycleProvider.isSameDay(_selectedDate, activePeriod.startDate);
+          
+          // Check if selected date is after the start date of active period
+          final isAfterStartDate = _selectedDate.isAfter(activePeriod.startDate) && 
+                                  !isSameStartDate;
+          
+          // Update state based on selected date relationship to active period
+          setState(() {
+            _lastActivePeriod = activePeriod;
+            
+            if (isAfterStartDate) {
+              print('Selected date is after active period start. Setting as continuing period');
+              _isPeriodStart = false;
+              _isContinuingPeriod = true;
+              _isPeriodEnd = false;
+            } else if (isSameStartDate) {
+              print('Selected date is same as period start date');
+              _isPeriodStart = true;
+              _isContinuingPeriod = false;
+              _isPeriodEnd = false;
+            } else {
+              print('Selected date is before active period start');
+              _isPeriodStart = true;
+              _isContinuingPeriod = false;
+              _isPeriodEnd = false;
+            }
+          });
+        } else {
+          print('No active period found (all periods have end dates)');
+          setState(() {
+            _isPeriodStart = true;
+            _isContinuingPeriod = false;
+            _isPeriodEnd = false;
+          });
+        }
+      } else {
+        print('No period records found');
+      }
+    });
   }
 
   @override
@@ -53,7 +128,7 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.existingData != null ? 'Edit Period Data' : 'Add Period Data',
+          widget.existingData != null ? 'Edit Period Entry' : 'Add Period Entry',
         ),
       ),
       body: SingleChildScrollView(
@@ -62,7 +137,7 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Date selection section
+              // Date display
               Card(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -73,27 +148,16 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Period Dates',
+                        'Date',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Start date picker
                       _buildDateField(
-                        label: 'Start Date',
-                        value: _startDate,
-                        onTap: () => _selectDate(context, true),
-                      ),
-                      const SizedBox(height: 16),
-                      // End date picker
-                      _buildDateField(
-                        label: 'End Date (Optional)',
-                        value: _endDate,
-                        onTap: () => _selectDate(context, false),
-                        showClear: _endDate != null,
-                        onClear: () => setState(() => _endDate = null),
+                        value: _selectedDate,
+                        onTap: _selectDate,
                       ),
                     ],
                   ),
@@ -101,6 +165,91 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
               ),
               
               const SizedBox(height: 16),
+              
+              // Period status section
+              if (widget.existingData == null || 
+                  !widget.existingData!.startDate.isAtSameMomentAs(_selectedDate)) ...[
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Period Status',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (_lastActivePeriod != null && 
+                            _selectedDate.isAfter(_lastActivePeriod!.startDate) &&
+                            !Provider.of<CycleProvider>(context, listen: false).isSameDay(
+                              _selectedDate, _lastActivePeriod!.startDate)) ...[
+                          // Show continuing period option for active periods
+                          _buildPeriodStatusOption(
+                            label: 'Continuing period from ${DateFormat.yMMMd().format(_lastActivePeriod!.startDate)}',
+                            value: true,
+                            groupValue: _isContinuingPeriod,
+                            onChanged: (value) {
+                              setState(() {
+                                _isContinuingPeriod = value!;
+                                _isPeriodStart = false;
+                                _isPeriodEnd = false;
+                              });
+                            },
+                          ),
+                          _buildPeriodStatusOption(
+                            label: 'End of period',
+                            value: true,
+                            groupValue: _isPeriodEnd,
+                            onChanged: (value) {
+                              setState(() {
+                                _isPeriodEnd = value!;
+                                _isContinuingPeriod = !value;
+                              });
+                            },
+                          ),
+                        ] else ...[
+                          // Show options for new period
+                          _buildPeriodStatusOption(
+                            label: 'First day of period',
+                            value: true,
+                            groupValue: _isPeriodStart,
+                            onChanged: (value) {
+                              setState(() {
+                                _isPeriodStart = value!;
+                                _isPeriodEnd = false;
+                                _isContinuingPeriod = false;
+                              });
+                            },
+                          ),
+                          if (_lastActivePeriod == null) ...[
+                            _buildPeriodStatusOption(
+                              label: 'Last day of period',
+                              value: true,
+                              groupValue: _isPeriodEnd,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isPeriodEnd = value!;
+                                  _isPeriodStart = !value;
+                                  _isContinuingPeriod = false;
+                                });
+                              },
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+              ],
               
               // Flow intensity section
               Card(
@@ -302,13 +451,10 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
 
   // Date selection field
   Widget _buildDateField({
-    required String label,
-    required DateTime? value,
+    required DateTime value,
     required Function() onTap,
-    bool showClear = false,
-    Function()? onClear,
   }) {
-    final dateFormat = DateFormat.yMMMd();
+    final dateFormat = DateFormat.yMMMEd();
     
     return GestureDetector(
       onTap: onTap,
@@ -331,27 +477,33 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                value != null ? dateFormat.format(value) : 'Select Date',
-                style: TextStyle(
-                  color: value != null
-                      ? Colors.black87
-                      : Colors.grey.shade500,
+                dateFormat.format(value),
+                style: const TextStyle(
+                  color: Colors.black87,
                   fontSize: 16,
                 ),
               ),
             ),
-            if (showClear)
-              IconButton(
-                icon: const Icon(
-                  Icons.clear,
-                  size: 20,
-                  color: Colors.grey,
-                ),
-                onPressed: onClear,
-              ),
           ],
         ),
       ),
+    );
+  }
+
+  // Period status option
+  Widget _buildPeriodStatusOption({
+    required String label,
+    required bool value,
+    required bool groupValue,
+    required Function(bool?) onChanged,
+  }) {
+    return RadioListTile<bool>(
+      title: Text(label),
+      value: value,
+      groupValue: groupValue,
+      onChanged: onChanged,
+      activeColor: AppColors.primary,
+      contentPadding: EdgeInsets.zero,
     );
   }
 
@@ -489,16 +641,11 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
   }
 
   // Date picker
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    final initialDate = isStartDate ? _startDate : (_endDate ?? _startDate);
-    final firstDate = isStartDate
-        ? DateTime(2020)
-        : _startDate; // End date must be after start date
-    
+  Future<void> _selectDate() async {
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: firstDate,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)), // Allow selecting today
       builder: (context, child) {
         return Theme(
@@ -516,36 +663,93 @@ class _AddPeriodScreenState extends State<AddPeriodScreen> {
     
     if (pickedDate != null) {
       setState(() {
-        if (isStartDate) {
-          _startDate = pickedDate;
-          // Adjust end date if it's before the new start date
-          if (_endDate != null && _endDate!.isBefore(_startDate)) {
-            _endDate = _startDate;
-          }
-        } else {
-          _endDate = pickedDate;
-        }
+        _selectedDate = pickedDate;
+        _checkForActivePeriod(); // Recheck for active period with the new date
       });
     }
   }
 
   // Save period data
   void _savePeriodData() {
-    final periodData = PeriodData(
-      startDate: _startDate,
-      endDate: _endDate,
-      flowIntensity: _flowIntensity,
-      symptoms: _selectedSymptoms,
-      mood: _mood,
-      notes: _notesController.text,
-    );
-    
     final cycleProvider = Provider.of<CycleProvider>(context, listen: false);
     
+    print('Saving period data:');
+    print('- isPeriodStart: $_isPeriodStart');
+    print('- isPeriodEnd: $_isPeriodEnd');
+    print('- isContinuingPeriod: $_isContinuingPeriod');
+    print('- hasActivePeriod: ${_lastActivePeriod != null}');
+    if (_lastActivePeriod != null) {
+      print('- activePeriodKey: ${_lastActivePeriod!.key}');
+    }
+    
     if (widget.existingData != null) {
+      // Updating existing record
+      print('Updating existing record: ${widget.existingData!.key}');
+      final periodData = PeriodData(
+        startDate: widget.existingData!.startDate,
+        endDate: _isPeriodEnd ? _selectedDate : widget.existingData!.endDate,
+        flowIntensity: _flowIntensity,
+        symptoms: _selectedSymptoms,
+        mood: _mood,
+        notes: _notesController.text,
+        intimacyData: widget.existingData!.intimacyData,
+      );
+      
       cycleProvider.updatePeriodRecord(widget.existingData!.key.toString(), periodData);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Period data updated successfully'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (_lastActivePeriod != null && (_isContinuingPeriod || _isPeriodEnd)) {
+      // Continuing an existing period or marking end date
+      print('Continuing/ending active period: ${_lastActivePeriod!.key}');
+      print('- Original start date: ${_lastActivePeriod!.startDate}');
+      print('- Setting end date: ${_isPeriodEnd ? _selectedDate : "none"}');
+      
+      final updatedPeriod = PeriodData(
+        startDate: _lastActivePeriod!.startDate,
+        endDate: _isPeriodEnd ? _selectedDate : null,
+        flowIntensity: _flowIntensity,
+        symptoms: [..._lastActivePeriod!.symptoms, ..._selectedSymptoms].toSet().toList(),
+        mood: _mood,
+        notes: _notesController.text.isNotEmpty ? 
+              "${_lastActivePeriod!.notes}\n${_notesController.text}" : 
+              _lastActivePeriod!.notes,
+        intimacyData: _lastActivePeriod!.intimacyData,
+      );
+      
+      cycleProvider.updatePeriodRecord(_lastActivePeriod!.key.toString(), updatedPeriod);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isPeriodEnd ? 
+                      'Period end date set to ${DateFormat.yMMMd().format(_selectedDate)}' : 
+                      'Period entry continued'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } else {
+      // New period start
+      print('Creating new period record with start date: $_selectedDate');
+      final periodData = PeriodData(
+        startDate: _selectedDate,
+        endDate: _isPeriodEnd ? _selectedDate : null, // If it's both start and end, set end date
+        flowIntensity: _flowIntensity,
+        symptoms: _selectedSymptoms,
+        mood: _mood,
+        notes: _notesController.text,
+      );
+      
       cycleProvider.addPeriodRecord(periodData);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New period entry added'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
     
     Navigator.pop(context);

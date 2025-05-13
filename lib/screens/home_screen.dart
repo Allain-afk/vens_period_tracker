@@ -12,6 +12,7 @@ import 'package:vens_period_tracker/screens/intimacy/intimacy_history_screen.dar
 import 'package:vens_period_tracker/screens/intimacy/intimacy_log_screen.dart';
 import 'package:vens_period_tracker/screens/period_history_screen.dart';
 import 'package:vens_period_tracker/screens/pill_tracking_screen.dart';
+import 'package:vens_period_tracker/screens/settings_screen.dart';
 import 'package:vens_period_tracker/utils/constants.dart';
 import 'package:vens_period_tracker/widgets/period_status_card.dart';
 import 'package:vens_period_tracker/widgets/prediction_card.dart';
@@ -27,6 +28,37 @@ class _HomeScreenState extends State<HomeScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  
+  // Define const BoxDecoration objects
+  static const BoxDecoration periodStartDecoration = BoxDecoration(
+    color: AppColors.accent,
+    shape: BoxShape.circle,
+  );
+  
+  static const BoxDecoration continuingPeriodDecoration = BoxDecoration(
+    color: AppColors.flowHeavy,
+    shape: BoxShape.circle,
+  );
+  
+  static const BoxDecoration predictedPeriodDecoration = BoxDecoration(
+    color: Color(0xFFFF9EB9), // AppColors.primary with opacity 0.5
+    shape: BoxShape.circle,
+  );
+  
+  static const BoxDecoration ovulationDayDecoration = BoxDecoration(
+    color: AppColors.success,
+    shape: BoxShape.circle,
+  );
+  
+  static const BoxDecoration fertileDayDecoration = BoxDecoration(
+    color: Color(0xFFA5D6A7), // AppColors.success with opacity 0.5
+    shape: BoxShape.circle,
+  );
+  
+  static const BoxDecoration intimacyDecoration = BoxDecoration(
+    color: Colors.pinkAccent,
+    shape: BoxShape.circle,
+  );
   
   @override
   void initState() {
@@ -133,19 +165,34 @@ class _HomeScreenState extends State<HomeScreen> {
                         calendarBuilders: CalendarBuilders(
                           markerBuilder: (context, date, events) {
                             // Mark period days
-                            final isPeriodDay = cycleProvider.periodRecords.any((record) {
-                              if (record.endDate == null) {
-                                return isSameDay(record.startDate, date);
+                            bool isPeriodDay = false;
+                            bool isContinuingPeriodDay = false;
+                            
+                            // First, check if the date is a period start date in any record
+                            for (final record in cycleProvider.periodRecords) {
+                              if (cycleProvider.isSameDay(record.startDate, date)) {
+                                isPeriodDay = true;
+                                break;
                               }
-                              
-                              final difference = record.endDate!.difference(record.startDate).inDays;
-                              for (int i = 0; i <= difference; i++) {
-                                if (isSameDay(record.startDate.add(Duration(days: i)), date)) {
-                                  return true;
+                            }
+                            
+                            // If not a start date, check if it's a user-logged continuing day
+                            if (!isPeriodDay) {
+                              // Get all PeriodData entries that contain this date
+                              for (final record in cycleProvider.periodRecords) {
+                                // Skip if this is just an intimacy record (no flow data)
+                                if (record.flowIntensity.isEmpty) continue;
+                                
+                                // If there's an end date, check if this date falls between start and end
+                                if (record.endDate != null) {
+                                  if (date.isAfter(record.startDate) && 
+                                      (date.isBefore(record.endDate!) || cycleProvider.isSameDay(date, record.endDate!))) {
+                                    isContinuingPeriodDay = true;
+                                    break;
+                                  }
                                 }
                               }
-                              return false;
-                            });
+                            }
                             
                             // Mark predicted period days
                             final nextPeriod = cycleProvider.getNextPeriodDate();
@@ -190,46 +237,37 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.accent,
-                                      shape: BoxShape.circle,
-                                    ),
+                                    decoration: periodStartDecoration,
+                                  ),
+                                if (isContinuingPeriodDay)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: continuingPeriodDecoration,
                                   ),
                                 if (isPredictedPeriodDay)
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.5),
-                                      shape: BoxShape.circle,
-                                    ),
+                                    decoration: predictedPeriodDecoration,
                                   ),
                                 if (isOvulationDay)
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.success,
-                                      shape: BoxShape.circle,
-                                    ),
+                                    decoration: ovulationDayDecoration,
                                   ),
                                 if (isFertileDay && !isOvulationDay)
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success.withOpacity(0.5),
-                                      shape: BoxShape.circle,
-                                    ),
+                                    decoration: fertileDayDecoration,
                                   ),
                                 if (hasIntimacy)
                                   Container(
                                     width: 8,
                                     height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.pinkAccent,
-                                      shape: BoxShape.circle,
-                                    ),
+                                    decoration: intimacyDecoration,
                                   ),
                               ],
                             );
@@ -264,8 +302,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 12),
                           _buildLegendItem(
-                            "Period Days", 
+                            "Period Start", 
                             AppColors.accent
+                          ),
+                          _buildLegendItem(
+                            "Continuing Period", 
+                            AppColors.flowHeavy
                           ),
                           _buildLegendItem(
                             "Predicted Period", 
@@ -339,6 +381,11 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               MaterialPageRoute(builder: (context) => const IntimacyHistoryScreen()),
             );
+          } else if (index == 5) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            );
           }
         },
         items: const [
@@ -367,6 +414,11 @@ class _HomeScreenState extends State<HomeScreen> {
             activeIcon: Icon(Icons.favorite, size: 28),
             label: 'Intimacy',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            activeIcon: Icon(Icons.settings, size: 28),
+            label: 'Settings',
+          ),
         ],
       ),
     );
@@ -374,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Widget _buildLegendItem(String label, Color color) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
           Container(
@@ -386,7 +438,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 14)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14),
+          ),
         ],
       ),
     );

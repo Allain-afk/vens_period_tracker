@@ -303,4 +303,11 @@ class PillProvider with ChangeNotifier {
     
     await updatePillData(updatedPillData);
   }
+  
+  // Reset all data (used for clearing all app data)
+  void resetData() {
+    _pillData = null;
+    _isUsingHormonalBirthControl = false;
+    notifyListeners();
+  }
 } 

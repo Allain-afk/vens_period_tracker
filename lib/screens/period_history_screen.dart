@@ -435,7 +435,7 @@ class PeriodHistoryScreen extends StatelessWidget {
               foregroundColor: Colors.red,
             ),
             onPressed: () {
-              provider.deletePeriodRecord(record.key);
+              provider.deletePeriodRecord(record.key, forceDelete: true);
               Navigator.pop(context);
               
               ScaffoldMessenger.of(context).showSnackBar(
