@@ -74,6 +74,33 @@ This document contains instructions for building the iOS version of Ven's Period
     - In the Archives window, select your archive
     - Click "Distribute App" and follow the instructions for App Store submission or ad-hoc distribution
 
+## Notification Setup for iOS
+
+To complete the notification setup for this app, you need to:
+
+1. Make sure you have the proper entitlements for notifications:
+   - Critical Alerts (requires special Apple permission)
+   - Time Sensitive notifications
+   - Background refresh
+
+2. Add the following capabilities in Xcode:
+   - Background Modes
+   - Push Notifications
+   - App Groups
+
+3. The following keys have been added to Info.plist:
+   - UIBackgroundModes with fetch and remote-notification
+   - NSCalendarsUsageDescription
+   - NSRemindersUsageDescription
+   - NSUserNotificationsUsageDescription
+
+4. The AppDelegate has been updated to handle:
+   - Exact notification timing using UNCalendarNotificationTrigger
+   - Background task scheduling
+   - Time-sensitive interruption level for critical notifications
+   
+Remember that Critical Alerts require special permission from Apple, which must be requested through the App Store Connect portal.
+
 ## Features to Test on iOS
 
 Please ensure that these features specific to iOS work correctly:

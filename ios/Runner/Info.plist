@@ -52,5 +52,11 @@
 	<string>This app needs to access reminders to help you track your pill intake schedule</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>This app uses notifications to remind you to take your birth control pills and notify you of upcoming period and fertility events</string>
+	<!-- Background capabilities for notifications -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
